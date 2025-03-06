@@ -1,0 +1,135 @@
+import java.sql.*;
+import java.util.Scanner;
+
+public class BankingSystem {
+    private static final String DB_URL = "jdbc:mysql://localhost:3306/bank_db";
+    private static final String USER = "root";
+    private static final String PASSWORD = "your_password";
+    
+    private static Connection connectDB() throws SQLException {
+        return DriverManager.getConnection(DB_URL, USER, PASSWORD);
+    }
+    
+    public static void registerUser(String name, String accountNumber, String pin) {
+        try (Connection conn = connectDB()) {
+            String sql = "INSERT INTO accounts (name, account_number, pin, balance) VALUES (?, ?, ?, 0.0)";
+            PreparedStatement stmt = conn.prepareStatement(sql);
+            stmt.setString(1, name);
+            stmt.setString(2, accountNumber);
+            stmt.setString(3, pin);
+            stmt.executeUpdate();
+            System.out.println("Account successfully created. Welcome, " + name + "!");
+        } catch (SQLException e) {
+            System.out.println("Error creating account. Please try again.");
+        }
+    }
+    
+    public static boolean loginUser(String accountNumber, String pin) {
+        try (Connection conn = connectDB()) {
+            String sql = "SELECT * FROM accounts WHERE account_number = ? AND pin = ?";
+            PreparedStatement stmt = conn.prepareStatement(sql);
+            stmt.setString(1, accountNumber);
+            stmt.setString(2, pin);
+            ResultSet rs = stmt.executeQuery();
+            return rs.next();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+    
+    public static void checkBalance(String accountNumber) {
+        try (Connection conn = connectDB()) {
+            String sql = "SELECT balance FROM accounts WHERE account_number = ?";
+            PreparedStatement stmt = conn.prepareStatement(sql);
+            stmt.setString(1, accountNumber);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                System.out.println("Current Balance: " + rs.getDouble("balance"));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+    
+    public static void depositMoney(String accountNumber, double amount) {
+        try (Connection conn = connectDB()) {
+            String sql = "UPDATE accounts SET balance = balance + ? WHERE account_number = ?";
+            PreparedStatement stmt = conn.prepareStatement(sql);
+            stmt.setDouble(1, amount);
+            stmt.setString(2, accountNumber);
+            stmt.executeUpdate();
+            System.out.println("Amount Deposited Successfully!");
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+    
+    public static void withdrawMoney(String accountNumber, double amount) {
+        try (Connection conn = connectDB()) {
+            String checkBalanceSql = "SELECT balance FROM accounts WHERE account_number = ?";
+            PreparedStatement checkStmt = conn.prepareStatement(checkBalanceSql);
+            checkStmt.setString(1, accountNumber);
+            ResultSet rs = checkStmt.executeQuery();
+            if (rs.next()) {
+                double balance = rs.getDouble("balance");
+                if (balance >= amount) {
+                    String sql = "UPDATE accounts SET balance = balance - ? WHERE account_number = ?";
+                    PreparedStatement stmt = conn.prepareStatement(sql);
+                    stmt.setDouble(1, amount);
+                    stmt.setString(2, accountNumber);
+                    stmt.executeUpdate();
+                    System.out.println("Withdrawal Successful!");
+                } else {
+                    System.out.println("Insufficient Balance!");
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+    
+    public static void main(String[] args) {
+        Scanner scanner = new Scanner(System.in);
+        System.out.println("Welcome to Banking System");
+        while (true) {
+            System.out.println("1. Register\n2. Login\n3. Exit");
+            int choice = scanner.nextInt();
+            scanner.nextLine();
+            if (choice == 1) {
+                System.out.print("Enter Name: ");
+                String name = scanner.nextLine();
+                System.out.print("Enter Account Number: ");
+                String accountNumber = scanner.nextLine();
+                System.out.print("Set PIN: ");
+                String pin = scanner.nextLine();
+                registerUser(name, accountNumber, pin);
+            } else if (choice == 2) {
+                System.out.print("Enter Account Number: ");
+                String accountNumber = scanner.nextLine();
+                System.out.print("Enter PIN: ");
+                String pin = scanner.nextLine();
+                if (loginUser(accountNumber, pin)) {
+                    System.out.println("Login Successful!");
+                    while (true) {
+                        System.out.println("1. Check Balance\n2. Deposit\n3. Withdraw\n4. Logout");
+                        int action = scanner.nextInt();
+                        if (action == 1) checkBalance(accountNumber);
+                        else if (action == 2) {
+                            System.out.print("Enter amount to deposit: ");
+                            double amount = scanner.nextDouble();
+                            depositMoney(accountNumber, amount);
+                        } else if (action == 3) {
+                            System.out.print("Enter amount to withdraw: ");
+                            double amount = scanner.nextDouble();
+                            withdrawMoney(accountNumber, amount);
+                        } else break;
+                    }
+                } else {
+                    System.out.println("Invalid Login Credentials!");
+                }
+            } else break;
+        }
+        scanner.close();
+    }
+}
